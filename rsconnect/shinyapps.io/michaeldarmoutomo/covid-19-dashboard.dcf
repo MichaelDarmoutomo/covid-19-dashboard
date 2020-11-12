@@ -1,0 +1,13 @@
+name: covid-19-dashboard
+title: covid-19-dashboard
+username:
+account: michaeldarmoutomo
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3212080
+bundleId: 3848869
+url: https://michaeldarmoutomo.shinyapps.io/covid-19-dashboard/
+when: 1605125882.61587
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: map_test.R|www/default-user.png|www/poor_man_flatly.R
