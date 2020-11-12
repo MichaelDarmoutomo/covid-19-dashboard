@@ -1,20 +1,9 @@
-#
-# This is the server logic of a Shiny web application. You can run the
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
 library(formattable)
 library(DT)
 library(maps)
 library(RColorBrewer)
 
-
-# Define server logic required to draw a histogram
 shinyServer(function(input, output) {
 
     ###########################
@@ -45,20 +34,12 @@ shinyServer(function(input, output) {
         deaths_day <- diff(total$deaths)
         recovered_day <- diff(total$recovered)
         
-        to_plot <- data.frame(
-            "New Cases" = cases_day,
-            "Daily Deaths" = deaths_day,
-            "Newly Recovered" = recovered_day
-            )
+        to_plot <- data.frame(cases_day, deaths_day, recovered_day)
+        colnames(to_plot) <- c("New Cases", "Daily Deaths", "Newly Recovered")
         
-        to_plot <- data.frame(
-            "Date" = as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y"),
-            "New Cases" = cases_day,
-            "Daily Deaths" = deaths_day,
-            "Newly Recovered" = recovered_day
-            )
+        to_plot$Date <-as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y")
         
-        amTimeSeries(to_plot,"Date",c("New Cases", "Daily Deaths", "Newly Recovered"),
+        amTimeSeries(to_plot,"Date", c("New Cases", "Daily Deaths", "Newly Recovered"),
                      scrollbarHeight=20, linetype = c("line","line","line"))
     })
     
@@ -426,7 +407,7 @@ shinyServer(function(input, output) {
         }
         
         # Confidence interval
-        conf <- qnorm(0.0975) * sd(predictions[8:length(predictions)]) / sqrt(length(predictions))
+        conf <- qnorm(0.975) * sd(predictions[8:length(predictions)]) / sqrt(length(predictions))
         
         upper <- predictions + conf
         lower <- predictions - conf
