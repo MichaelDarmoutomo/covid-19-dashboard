@@ -17,100 +17,66 @@ library(RColorBrewer)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
 
-    ###################
-    #### Dashboard ####
-    ###################
+    ###########################
+    #### Global Statistics ####
+    ###########################
         
     output$total_confirmed <- renderText({ 
-        paste("", comma(total$confirmed,0))
+        paste("", comma(total$confirmed[length(total$confirmed)],0))
     })
     
     output$total_deaths <- renderText({ 
-        paste("", comma(total$deaths,0))
+        paste("", comma(total$deaths[length(total$deaths)],0))
     })
     
     output$total_recovered <- renderText({ 
-        paste("", comma(total$recovered,0))
-    })
-    
-    output$countriesBad <- renderDataTable({
-        myDT <- DT::datatable(country_performance[,c(1,3)] %>% filter(slope > 0),
-                      options = list(scrollY = '300px'),
-                      rownames=FALSE)
-        
-    })
-    
-    output$countriesGood <- renderDataTable({
-        DT::datatable(country_performance[,c(1,3)] %>% filter(slope < 0),
-                      options = list(scrollY = '300px'),
-                      rownames=FALSE)
-    })
-    
-    rawData <- reactive({
-        dataset <- (paste0("data.",input$datasetSelector))
-        eval(parse(text=dataset))
-    })
-    
-    output$rawdata <- renderDataTable({
-       
-        myDT <- DT::datatable(rawData(),
-                              options = list(scrollX = TRUE))
-        
+        paste("", comma(total$recovered[length(total$recovered)],0))
     })
 
     output$confirmedPlot <- renderAmCharts({
-
         # draw the histogram with the specified number of bins
-        amTimeSeries(df.total, 'date', c("confirmed", "deaths", "recovered"), linetype = c("line","line","line"),
-                     # fillAlphas = 1,
-                     scrollbarHeight=20)
+        amTimeSeries(df.total, 'date', c("confirmed", "deaths", "recovered"), 
+                     linetype = c("line","line","line"),
+                     scrollbarHeight = 20)
     })
     
     output$conf_perday <- renderAmCharts({
-        world_conf <- apply(data.confirmed[,5:ncol(data.confirmed)],2,FUN = sum)
-        world_deaths <- apply(data.deaths[,5:ncol(data.confirmed)],2,FUN=sum)
-        world_recovered <- apply(data.recovered[,5:ncol(data.confirmed)],2,FUN=sum)
-        cases_day <- diff(world_conf)
-        deaths_day <- diff(world_deaths)
-        recovered_day <- diff(world_recovered)
-        to_plot <- data.frame("New Cases"=cases_day,"Daily Deaths"=deaths_day,"Newly Recovered"=recovered_day)
-        to_plot <- data.frame("Date"=as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y"),"New Cases"=cases_day,"Daily Deaths"=deaths_day,"Newly Recovered"=recovered_day)
-        amTimeSeries(to_plot,"Date",c("New.Cases", "Daily.Deaths", "Newly.Recovered"),scrollbarHeight=20, linetype = c("line","line","line"))
-    })
-    
-    library(ggplot2)
-    output$myggplot <- renderPlot({
-        colors <- c("Confirmed" = "orange", "Deaths" = "red", "Recovered" = "green")
-
-        ggplot(df.total) + aes(x=date) +
-            geom_area(aes(y=confirmed), fill="orange", color="orange", alpha=0.3) +
-            geom_area(aes(y=deaths), fill="red", color="red", alpha=0.3) +
-            geom_area(aes(y=recovered), fill="green", color="green", alpha=0.3) +
-            # scale_color_manual(values = colors) +
-            theme_bw() +
-            theme(axis.line = element_blank(),
-                  panel.grid.major = element_blank(),
-                  panel.grid.minor = element_blank(),
-                  panel.border = element_blank(),
-                  plot.background = element_rect(fill=rgb(248/255,248/255,248/255)),
-                  panel.background = element_rect(fill=rgb(248/255,248/255,248/255)),
-                  axis.title.x=element_blank(),
-                  axis.text.x=element_blank(),
-                  axis.ticks.x=element_blank(),
-                  axis.title.y=element_blank(),
-                  axis.text.y=element_blank(),
-                  axis.ticks.y=element_blank())
+        cases_day <- diff(total$confirmed)
+        deaths_day <- diff(total$deaths)
+        recovered_day <- diff(total$recovered)
+        
+        to_plot <- data.frame(
+            "New Cases" = cases_day,
+            "Daily Deaths" = deaths_day,
+            "Newly Recovered" = recovered_day
+            )
+        
+        to_plot <- data.frame(
+            "Date" = as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y"),
+            "New Cases" = cases_day,
+            "Daily Deaths" = deaths_day,
+            "Newly Recovered" = recovered_day
+            )
+        
+        amTimeSeries(to_plot,"Date",c("New Cases", "Daily Deaths", "Newly Recovered"),
+                     scrollbarHeight=20, linetype = c("line","line","line"))
     })
     
     output$statusMap <- renderLeaflet({
         data <- merge(world, country_performance_today, by="iso3c")
         
-        mybins <- c(-Inf,-10,10,Inf)
-        mypalette <- colorBin( palette=c("green", "orange", "red"), domain=data$slope, na.color="transparent", bins=mybins, pretty=T)
+        mybins <- c(-Inf, -10, 10, Inf)
+        
+        mypalette <- colorBin(
+            palette = c("green", "orange", "red"), 
+            domain = data$slope, 
+            na.color = "transparent", 
+            bins = mybins
+            )
         
         leaflet(data) %>% 
             addTiles()  %>% 
-            setView( lat=36, lng=28 , .5) %>%
+            setView(lat=36, lng=28, .5) %>%
             addPolygons( 
                 fillColor = ~mypalette(data$slope), 
                 stroke=TRUE, 
@@ -120,14 +86,12 @@ shinyServer(function(input, output) {
                 label = data$country
             )
     })
-    
-        
-    
         
     
     ###################
     #### COVID Map ####
     ###################
+    
     complete <- reactive({
         complete <- merge(world,jh_covid19_data[jh_covid19_data$date==input$day,], by="iso3c")
         
@@ -246,6 +210,7 @@ shinyServer(function(input, output) {
     })
     
     output$world_map2 <- renderLeaflet({
+        
         # Per 1M inhabitants
         if (input$maptype2 == 1) {
             typeData <- paste0(input$mapdata2, "_adj")
@@ -342,16 +307,45 @@ shinyServer(function(input, output) {
     #### Per Country ####
     #####################
     
+    countryData <- reactive({
+        countryData <- jh_covid19_data[which(jh_covid19_data$country == input$country),]
+        countryData$date <- as.POSIXct(countryData$date)
+        
+        # sometimes code above doesn't run quick enough, 
+        # this ensures it will run first before continuing (weird bug)
+        print(countryData)
+    })
+    
     SelectedCountry <- reactive({
-        print(countryData()$iso3c[1])
         SelectedCountry <- maps::map("world", fill = TRUE, plot = FALSE, regions=countryData()$country[1], exact=TRUE)
     })
     
     output$countryMap <- renderLeaflet({
+        
+        mytext <- paste(
+            "Country: ", countryData()$country[1],"<br/>", 
+            "Cases: ", comma(countryData()$confirmed[length(countryData()$confirmed)], 0), " (+",
+            comma(countryData()$confirmed[length(countryData()$confirmed)] - countryData()$confirmed[(length(countryData()$confirmed) - 1)], 0), ")", "<br/>",
+            "Deaths: ", comma(countryData()$deaths[length(countryData()$deaths)], 0), " (+",
+            comma(countryData()$deaths[length(countryData()$deaths)] - countryData()$deaths[(length(countryData()$deaths) - 1)], 0), ")",
+            sep="") %>%
+            lapply(htmltools::HTML)
+        
         leaflet(SelectedCountry()) %>%
             fitBounds(SelectedCountry()$range[1], SelectedCountry()$range[3], 
                       SelectedCountry()$range[2], SelectedCountry()$range[4]) %>%
-            addPolygons(fillOpacity = 0.6,  smoothFactor = 0.25, stroke = TRUE, weight = 1) %>%
+            addPolygons(
+                fillOpacity = 0.6,
+                smoothFactor = 0.25, 
+                stroke = TRUE, 
+                weight = 1,
+                label = mytext,
+                labelOptions = labelOptions( 
+                    style = list("font-weight" = "normal", padding = "3px 8px"), 
+                    textsize = "13px", 
+                    direction = "auto"
+                    )
+                ) %>%
             addProviderTiles("OpenStreetMap",
                              options = providerTileOptions(noWrap = FALSE)
             )
@@ -359,34 +353,26 @@ shinyServer(function(input, output) {
     
     output$countryBoxConfirmed <- renderInfoBox({
         infoBox(
-            "total Cases", paste("", comma(countryData()[nrow(countryData()), "confirmed"],0)), icon = icon("viruses"),
+            "total cases", paste("", comma(countryData()[nrow(countryData()), "confirmed"],0)), icon = icon("viruses"),
             color = "orange", fill = TRUE
         )
     })
     
     output$countryBoxDeaths <- renderInfoBox({
         infoBox(
-            "total Deaths", paste("", comma(countryData()[nrow(countryData()), "deaths"],0)), icon = icon("feather"),
+            "total deaths", paste("", comma(countryData()[nrow(countryData()), "deaths"],0)), icon = icon("feather"),
             color = "red", fill = TRUE
         )
     })
     
     output$countryBoxRecovered <- renderInfoBox({
         infoBox(
-            title="Total Recovered", paste("", comma(countryData()[nrow(countryData()), "recovered"],0)), icon = icon("heart"),
+            title="total recovered", paste("", comma(countryData()[nrow(countryData()), "recovered"],0)), icon = icon("heart"),
             color = "green", fill = TRUE
         )
     })
     
-    
-    countryData <- reactive({
-        countryData <- jh_covid19_data[which(jh_covid19_data$country == input$country),]
-        countryData$date <- as.POSIXct(countryData$date)
-        print(countryData)
-    })
-    
     output$countryPlot <- renderAmCharts({
-        
         # draw the histogram with the specified number of bins
         amTimeSeries(countryData(), 'date', c("confirmed", "deaths", "recovered"),
                      scrollbarHeight=20, main=input$country)
@@ -398,89 +384,114 @@ shinyServer(function(input, output) {
     ##################
     
     model <- reactive({
-        world_conf<-apply(data.confirmed[,5:ncol(data.confirmed)],2,FUN = sum)
-        world_deaths<-apply(data.deaths[,5:ncol(data.confirmed)],2,FUN=sum)
-        world_recovered<-apply(data.recovered[,5:ncol(data.confirmed)],2,FUN=sum)
-        cases_day<-diff(world_conf)
-        deaths_day<-diff(world_deaths)
-        recovered_day<-diff(world_recovered)
-        data_for_model<-cbind(cases_day[8:length(cases_day)],
-                              cases_day[7:length((cases_day-1))],
-                              cases_day[6:length((cases_day-2))],
-                              cases_day[5:length((cases_day-3))],
-                              cases_day[4:length((cases_day-4))],
-                              cases_day[3:length((cases_day-5))],
-                              cases_day[2:length((cases_day-6))],
-                              cases_day[1:length((cases_day-7))])
-        data_for_model<-data.frame(data_for_model)
-        y<-data_for_model[,1]
-        x<-data_for_model[,(as.numeric(input$id_check_model) + 1)]
-        data<-data.frame(y,x)
-        model<-lm(y~.,data=data)
-        model
+        cases_day <- diff(total$confirmed)
+        deaths_day <- diff(total$deaths)
+        recovered_day <- diff(total$recovered)
+        
+        # Create lag matrix
+        data_for_model <- cbind(
+            cases_day[8:length(cases_day)],
+            cases_day[7:length(cases_day-1)],
+            cases_day[6:length(cases_day-2)],
+            cases_day[5:length(cases_day-3)],
+            cases_day[4:length(cases_day-4)],
+            cases_day[3:length(cases_day-5)],
+            cases_day[2:length(cases_day-6)],
+            cases_day[1:length(cases_day-7)])
+        
+        data_for_model <- data.frame(data_for_model)
+        
+        y <- data_for_model[,1]
+        x <- data_for_model[,(as.numeric(input$id_check_model) + 1)]
+        
+        data <- data.frame(y,x)
+        model <- lm(y~., data=data)
     })
     
-    output$regression<-renderPrint({
+    output$regression <- renderPrint({
         summary(model())
     })
     
-    output$predicted_cases<-renderText({
-        world_conf<-apply(data.confirmed[,5:ncol(data.confirmed)],2,FUN = sum)
-        cases_day<-diff(world_conf)
-        paste(comma(model()$coefficients[1]+sum(model()$coefficients[-1]*cases_day[(length(cases_day)-length(as.numeric(input$id_check_model))+1):length(cases_day)]), 0), "new cases")
+    output$predicted_cases <- renderText({
+        cases_day <- diff(total$confirmed)
+        paste(comma(model()$coefficients[1] + sum(model()$coefficients[-1] * cases_day[(length(cases_day)-length(as.numeric(input$id_check_model))+1):length(cases_day)]), 0), "new cases")
     })
     
-    output$pred_chart<-renderAmCharts({
-        world_conf <-apply(data.confirmed[,5:ncol(data.confirmed)],2,FUN = sum)
-        cases_day<-diff(world_conf)
-        predictions<-vector()
+    output$pred_chart <- renderAmCharts({
+        cases_day <- diff(total$confirmed)
+        predictions <- vector()
         
         for (i in (length(as.numeric(input$id_check_model))+1):length(cases_day)){
             predictions[i] <- model()$coefficients[1] + sum(model()$coefficients[-1] * cases_day[(i-length(as.numeric(input$id_check_model))):(i-1)])
         }
         
         # Confidence interval
-        conf <- qnorm(1-0.025) * sd(predictions[8:length(predictions)]) / sqrt(length(predictions))
-        upper<-predictions+conf
-        lower<-predictions-conf
+        conf <- qnorm(0.0975) * sd(predictions[8:length(predictions)]) / sqrt(length(predictions))
+        
+        upper <- predictions + conf
+        lower <- predictions - conf
         
         # Plot
-        to_plot <- data.frame("New Cases"=cases_day,"Predictions"=predictions)
-        to_plot <- data.frame("Date"=as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y"),"New Cases"=cases_day,"Predicted"=predictions,"Upper"=upper,"Lower"=lower)
-        print(to_plot)
+        to_plot <- data.frame(
+            "New Cases" = cases_day,
+            "Predictions" = predictions)
+        
+        to_plot <- data.frame(
+            "Date" = as.POSIXct(substring(rownames(to_plot),2), format = "%m.%d.%y"),
+            "New Cases" = cases_day,
+            "Predicted" = predictions,
+            "Upper" = upper,
+            "Lower" = lower)
+        
         amTimeSeries(to_plot, "Date", list("New.Cases", c("Lower", "Predicted", "Upper")),
-                     # linetype=c(1,1),
                      main="(Predicted) Cases",
                      color=c("blue","red"),
                      scrollbarHeight=20)
     })
     
-    output$message<-renderMenu({
-        world_conf <- apply(data.confirmed[,5:ncol(data.confirmed)],2,FUN = sum)
-        world_deaths <- apply(data.deaths[,5:ncol(data.confirmed)],2,FUN=sum)
-        world_recovered <- apply(data.recovered[,5:ncol(data.confirmed)],2,FUN=sum)
-        cases_day <- diff(world_conf)
-        deaths_day <- diff(world_deaths)
-        recovered_day <- diff(world_recovered)
-        dropdownMenu(type = "notifications", badgeStatus = "warning",headerText = "The situation today: ",
-                     notificationItem(icon = icon("viruses"), status = "info",
-                                      paste("Cases: ", comma(cases_day[length(cases_day)],0))
-                     ),
-                     notificationItem(icon = icon("feather"), status = "danger",
-                                      paste("Deaths: ", comma(deaths_day[length(deaths_day)],0))
-                     ),
-                     notificationItem(icon = icon("heart"), status = "info",
-                                      paste("Recoveries: ",comma(recovered_day[length(recovered_day)],0))
-                     ))
+    output$message <- renderMenu({
+        cases_day <- diff(total$confirmed)
+        deaths_day <- diff(total$deaths)
+        recovered_day <- diff(total$recovered)
+        
+        dropdownMenu(
+            type = "notifications", 
+            badgeStatus = "warning",
+            headerText = "The situation today: ",
+            notificationItem(
+                icon = icon("viruses"), status = "info",
+                paste("Cases: ", comma(cases_day[length(cases_day)],0))),
+            notificationItem(
+                icon = icon("feather"), status = "danger",
+                paste("Deaths: ", comma(deaths_day[length(deaths_day)],0))),
+            notificationItem(
+                icon = icon("heart"), status = "info",
+                paste("Recoveries: ",comma(recovered_day[length(recovered_day)],0)))
+        )
     })
     
-    output$message2<-renderMenu({
-        dropdownMenu(type = "messages", icon = icon("address-card"), badgeStatus = "primary",headerText = "Authors: ",
-                     notificationItem(icon = icon("users"), status = "info",
-                                      "CHIRITA Andrei"),
-                     notificationItem(icon = icon("users"), status = "info",
-                                      "DARMOUTOMO Michael"
-                     ))
+    output$message2 <- renderMenu({
+        dropdownMenu(
+            type = "messages", 
+            icon = icon("address-card"), 
+            badgeStatus = "primary",
+            headerText = "Authors: ",
+            notificationItem(icon = icon("users"), status = "info", "CHIRITA Andrei"),
+            notificationItem(icon = icon("users"), status = "info", "DARMOUTOMO Michael"))
+    })
+    
+    
+    ##################
+    #### Raw Data ####
+    ##################
+    
+    rawData <- reactive({
+        dataset <- (paste0("data.",input$datasetSelector))
+        eval(parse(text=dataset))
+    })
+    
+    output$rawdata <- renderDataTable({
+        DT::datatable(rawData(), options = list(scrollX = TRUE))
     })
     
     output$downloadData <- downloadHandler(
