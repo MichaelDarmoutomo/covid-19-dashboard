@@ -1,7 +1,5 @@
 rm(list=ls())
 
-library(lubridate)
-
 # Load data
 data.confirmed <- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
 data.deaths <- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
@@ -9,9 +7,9 @@ data.recovered <- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COV
 
 # Compute statistics
 total <- list()
-total$confirmed <- sum(data.confirmed[, ncol(data.confirmed)])
-total$deaths <- sum(data.deaths[, ncol(data.deaths)])
-total$recovered <- sum(data.recovered[, ncol(data.recovered)])
+total$confirmed <- colSums(data.confirmed[, 5:ncol(data.confirmed)])
+total$deaths <- colSums(data.deaths[, 5:ncol(data.deaths)])
+total$recovered <- colSums(data.recovered[, 5:ncol(data.recovered)])
 
 library(tidyverse)
 library(lubridate)
@@ -92,12 +90,12 @@ library(zoo)
 
 countries <- unique(jh_covid19_data$country)
 
-# Group by Country
-by_country <- jh_covid19_data %>% group_by(country)  %>% slice(tail(row_number(), 20))
-by_country <- by_country %>% mutate(diff_confirmed = confirmed - lag(confirmed))
-by_country <- by_country %>% mutate(MA = SMA(diff_confirmed, n=7))
+# Group by Country and get last 20 days.
+by_country <- jh_covid19_data %>% group_by(country) %>% 
+  slice(tail(row_number(), 20)) %>% 
+  mutate(diff_confirmed = confirmed - lag(confirmed)) %>% 
+  mutate(MA = SMA(diff_confirmed, n=7))
 by_country <- by_country[complete.cases(by_country), ]
-plot(by_country[which(by_country$iso3c=="NLD"), ]$MA)
 
 library(purrr)
 nested_by_country <- by_country %>% nest() %>% 
